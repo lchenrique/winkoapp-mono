@@ -1,0 +1,61 @@
+{
+  "name": "winkoapp-api",
+  "version": "1.0.0",
+  "description": "API de chat em tempo real estilo WhatsApp",
+  "main": "dist/server.js",
+  "packageManager": "pnpm@8.0.0",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "db:generate": "drizzle-kit generate:pg",
+    "db:push": "drizzle-kit push:pg",
+    "db:migrate": "tsx src/lib/migrate.ts",
+    "db:studio": "drizzle-kit studio",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "setup": "pnpm install && pnpm docker:up && pnpm db:generate && pnpm db:migrate"
+  },
+  "keywords": [
+    "fastify",
+    "socket.io",
+    "chat",
+    "whatsapp",
+    "api"
+  ],
+  "author": "Developer",
+  "license": "MIT",
+  "dependencies": {
+    "@fastify/cors": "^8.4.0",
+    "@fastify/helmet": "^11.1.1",
+    "@fastify/jwt": "^7.2.4",
+    "@fastify/multipart": "^8.0.0",
+    "@fastify/rate-limit": "^9.0.1",
+    "@fastify/swagger": "^8.13.0",
+    "@fastify/swagger-ui": "^2.1.0",
+    "@fastify/websocket": "^8.3.1",
+    "bcryptjs": "^2.4.3",
+    "drizzle-orm": "^0.29.1",
+    "fastify": "^4.24.3",
+    "fastify-type-provider-zod": "^1.2.0",
+    "ioredis": "^5.3.2",
+    "jsonwebtoken": "^9.0.2",
+    "minio": "^7.1.3",
+    "pg": "^8.11.3",
+    "postgres": "^3.4.7",
+    "socket.io": "^4.7.4",
+    "uuid": "^9.0.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^20.9.0",
+    "@types/pg": "^8.10.9",
+    "@types/uuid": "^9.0.7",
+    "drizzle-kit": "^0.20.4",
+    "tsx": "^4.1.4",
+    "typescript": "^5.2.2"
+  }
+}

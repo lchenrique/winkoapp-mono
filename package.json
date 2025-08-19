@@ -1,0 +1,43 @@
+{
+  "name": "winkoapp-monorepo",
+  "version": "1.0.0",
+  "description": "WinkoApp - Chat em tempo real (API + Frontend)",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"pnpm run dev:api\" \"pnpm run dev:web\" \"pnpm run dev:web-old\"",
+    "dev:api": "cd api && pnpm dev",
+    "dev:web": "cd web && pnpm run dev",
+    "dev:web-old": "cd web-old && python -m http.server 3001 || http-server -p 3001 || live-server --port=3001",
+    "dev:backend": "pnpm run dev:api",
+    "dev:frontend": "pnpm run dev:web",
+    "dev:full": "concurrently \"pnpm run dev:api\" \"pnpm run dev:web\"",
+    "install:all": "pnpm install",
+    "install:api": "cd api && pnpm install",
+    "install:web": "cd web && pnpm install",
+    "setup": "pnpm install && echo \"✅ Setup concluído! Use 'pnpm run dev' para rodar tudo\"",
+    "start": "pnpm run dev",
+    "build": "concurrently \"pnpm run build:api\" \"pnpm run build:web\"",
+    "build:api": "cd api && pnpm build",
+    "build:web": "cd web && pnpm run build",
+    "clean": "concurrently \"pnpm run clean:api\" \"pnpm run clean:web\"",
+    "clean:api": "cd api && rm -rf node_modules dist",
+    "clean:web": "cd web && rm -rf node_modules dist"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "http-server": "^14.1.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "chat",
+    "real-time",
+    "react",
+    "fastify",
+    "socket.io",
+    "monorepo"
+  ],
+  "author": "Developer",
+  "license": "MIT"
+}
