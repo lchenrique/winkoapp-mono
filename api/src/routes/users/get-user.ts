@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { db, users } from '../../lib/db';
 import { eq } from 'drizzle-orm';
 import { authenticate } from '../../middlewares/auth';
+import { StatusService } from '../../services/status-service';
 
 const userResponseSchema = z.object({
   id: z.string(),
@@ -11,8 +12,11 @@ const userResponseSchema = z.object({
   phone: z.string().nullable(),
   avatar: z.string().nullable(),
   status: z.string().nullable(),
+  userStatus: z.enum(['online', 'busy', 'away', 'offline']),
+  effectiveStatus: z.enum(['online', 'busy', 'away', 'offline']),
   lastSeen: z.string().nullable(),
   isOnline: z.boolean(),
+  isConnected: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -52,6 +56,7 @@ export const getUserById: FastifyPluginAsyncZod = async (app) => {
           name: users.name,
           avatar: users.avatar,
           status: users.status,
+          userStatus: users.userStatus,
           lastSeen: users.lastSeen,
           isOnline: users.isOnline,
           createdAt: users.createdAt,
@@ -69,6 +74,13 @@ export const getUserById: FastifyPluginAsyncZod = async (app) => {
         });
       }
 
+      // Get effective status using StatusService (single source of truth)
+      const effectiveStatusInfo = await StatusService.getEffectiveUserStatus(id);
+      const effectiveStatus = effectiveStatusInfo?.status || 'offline';
+      const isConnected = effectiveStatusInfo?.isConnected || false;
+
+      console.log(`🔍 getUserById: ${user.name} - DB status: ${user.userStatus}, Effective: ${effectiveStatus}, Connected: ${isConnected}`);
+
       return {
         id: user.id,
         name: user.name,
@@ -76,8 +88,11 @@ export const getUserById: FastifyPluginAsyncZod = async (app) => {
         phone: user.phone,
         avatar: user.avatar,
         status: user.status,
+        userStatus: user.userStatus || 'online', // Raw status from DB
+        effectiveStatus, // Calculated status (SOURCE OF TRUTH)
         lastSeen: user.lastSeen?.toISOString() || null,
-        isOnline: user.isOnline ?? false,
+        isOnline: user.isOnline ?? false, // Legacy field
+        isConnected, // Real connection status
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
       };

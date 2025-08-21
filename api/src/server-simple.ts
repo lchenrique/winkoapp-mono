@@ -47,8 +47,12 @@ async function buildServer() {
   });
 
   await fastify.register(rateLimit, {
-    max: 100,
-    timeWindow: '1 minute',
+    max: parseInt(process.env.RATE_LIMIT_MAX || '1000'), // Configurável via env
+    timeWindow: process.env.RATE_LIMIT_TIME_WINDOW || '1 minute',
+    // Configurações adicionais para desenvolvimento
+    skipOnError: true, // Skip rate limiting on internal errors
+    skipSuccessfulRequests: false,
+    skipFailedRequests: false,
   });
 
   await fastify.register(jwt, {

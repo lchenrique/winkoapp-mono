@@ -17,7 +17,7 @@ import swaggerUI from '@fastify/swagger-ui';
 import { routes } from './routes';
 
 // Import services
-import { initializeSimpleSocketService } from './services/socket-debug';
+import { initializeSocketService } from './services/socket';
 import { initializeBucket } from './lib/storage';
 import { redis } from './lib/redis';
 
@@ -47,8 +47,12 @@ async function buildServer() {
   });
 
   await fastify.register(rateLimit, {
-    max: 100,
-    timeWindow: '1 minute',
+    max: parseInt(process.env.RATE_LIMIT_MAX || '1000'), // Configurável via env
+    timeWindow: process.env.RATE_LIMIT_TIME_WINDOW || '1 minute',
+    // Configurações adicionais para desenvolvimento
+    skipOnError: true, // Skip rate limiting on internal errors
+    skipSuccessfulRequests: false,
+    skipFailedRequests: false,
   });
 
   await fastify.register(jwt, {
@@ -240,8 +244,8 @@ async function start() {
       host: '0.0.0.0', // Listen on all interfaces
     });
 
-    console.log('⚡ Initializing Socket.IO (Debug Mode)...');
-    const socketService = initializeSimpleSocketService(fastify.server);
+    console.log('⚡ Initializing Socket.IO...');
+    const socketService = initializeSocketService(fastify.server);
 
     console.log(`✅ Server running at http://${HOST}:${PORT}`);
     console.log(`📚 API Documentation: http://${HOST}:${PORT}/docs`);

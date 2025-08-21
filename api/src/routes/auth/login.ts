@@ -6,11 +6,8 @@ import { eq, or } from 'drizzle-orm';
 
 const loginSchema = z.object({
   body: z.object({
-    email: z.string().email().optional(),
-    phone: z.string().min(10).max(20).optional(),
-    password: z.string().min(1),
-  }).refine(data => data.email || data.phone, {
-    message: "Either email or phone is required"
+    identifier: z.string().min(1, "Username ou email é obrigatório"),
+    password: z.string().min(1, "Senha é obrigatória"),
   }),
 });
 
@@ -34,7 +31,7 @@ export const login: FastifyPluginAsyncZod = async (app) => {
   app.post('/login', {
     schema: {
       tags: ['Authentication'],
-      description: 'Login with email/phone and password',
+      description: 'Login with username/email and password',
       body: loginSchema.shape.body,
       response: {
         200: loginResponseSchema,
@@ -51,27 +48,29 @@ export const login: FastifyPluginAsyncZod = async (app) => {
       },
     },
   }, async (request, reply) => {
-    const { email, phone, password } = request.body;
+    const { identifier, password } = request.body;
 
     // Validate input
-    if (!email && !phone) {
+    if (!identifier || !password) {
       return reply.status(400).send({
         statusCode: 400,
         error: 'Bad Request',
-        message: 'Either email or phone is required',
+        message: 'Username/email e senha são obrigatórios',
       });
     }
 
     try {
-      // Find user
+      // Determine if identifier is email or username
+      const isEmail = identifier.includes('@');
+      
+      // Find user by email or username
       const [user] = await db
         .select()
         .from(users)
         .where(
-          or(
-            email ? eq(users.email, email) : undefined,
-            phone ? eq(users.phone, phone) : undefined
-          )
+          isEmail 
+            ? eq(users.email, identifier)
+            : eq(users.username, identifier)
         )
         .limit(1);
 

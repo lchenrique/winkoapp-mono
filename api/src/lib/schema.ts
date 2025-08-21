@@ -17,31 +17,53 @@ import {
 export const conversationTypeEnum = pgEnum('conversation_type', ['private', 'group']);
 export const messageTypeEnum = pgEnum('message_type', ['text', 'image', 'video', 'audio', 'document']);
 export const messageStatusEnum = pgEnum('message_status_enum', ['sent', 'delivered', 'read']);
+export const friendRequestStatusEnum = pgEnum('friend_request_status', ['pending', 'accepted', 'rejected']);
+export const userStatusEnum = pgEnum('user_status', ['online', 'busy', 'away', 'offline']);
 
 // Users table
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
+  username: varchar('username', { length: 30 }).unique().notNull(),
   email: varchar('email', { length: 255 }).unique(),
   phone: varchar('phone', { length: 20 }).unique(),
   password: varchar('password', { length: 255 }).notNull(),
   name: varchar('name', { length: 100 }).notNull(),
   avatar: text('avatar'),
   status: text('status').default('Available'),
+  userStatus: userStatusEnum('user_status').default('online'),
   lastSeen: timestamp('last_seen').defaultNow(),
   isOnline: boolean('is_online').default(false),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
+  usernameIdx: uniqueIndex('users_username_idx').on(table.username),
   emailIdx: uniqueIndex('users_email_idx').on(table.email),
   phoneIdx: uniqueIndex('users_phone_idx').on(table.phone),
 }));
 
-// Contacts table
+// Friend Requests table
+export const friendRequests = pgTable('friend_requests', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  senderId: uuid('sender_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  receiverId: uuid('receiver_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  status: friendRequestStatusEnum('status').default('pending').notNull(),
+  message: varchar('message', { length: 255 }), // Optional message with request
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  senderReceiverIdx: uniqueIndex('friend_requests_sender_receiver_idx').on(table.senderId, table.receiverId),
+  senderIdx: index('friend_requests_sender_idx').on(table.senderId),
+  receiverIdx: index('friend_requests_receiver_idx').on(table.receiverId),
+  statusIdx: index('friend_requests_status_idx').on(table.status),
+}));
+
+// Contacts table (now only created after friend request is accepted)
 export const contacts = pgTable('contacts', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   contactId: uuid('contact_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   nickname: varchar('nickname', { length: 100 }),
+  friendRequestId: uuid('friend_request_id').references(() => friendRequests.id, { onDelete: 'cascade' }), // Reference to original request
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   userContactIdx: uniqueIndex('contacts_user_contact_idx').on(table.userId, table.contactId),
@@ -122,10 +144,26 @@ export const messageReactions = pgTable('message_reactions', {
 export const usersRelations = relations(users, ({ many }) => ({
   contacts: many(contacts, { relationName: 'userContacts' }),
   contactOf: many(contacts, { relationName: 'contactOf' }),
+  sentFriendRequests: many(friendRequests, { relationName: 'sentRequests' }),
+  receivedFriendRequests: many(friendRequests, { relationName: 'receivedRequests' }),
   conversationMembers: many(conversationMembers),
   messages: many(messages),
   messageStatus: many(messageStatus),
   messageReactions: many(messageReactions),
+}));
+
+export const friendRequestsRelations = relations(friendRequests, ({ one, many }) => ({
+  sender: one(users, {
+    fields: [friendRequests.senderId],
+    references: [users.id],
+    relationName: 'sentRequests',
+  }),
+  receiver: one(users, {
+    fields: [friendRequests.receiverId],
+    references: [users.id],
+    relationName: 'receivedRequests',
+  }),
+  contacts: many(contacts),
 }));
 
 export const contactsRelations = relations(contacts, ({ one }) => ({
@@ -138,6 +176,10 @@ export const contactsRelations = relations(contacts, ({ one }) => ({
     fields: [contacts.contactId],
     references: [users.id],
     relationName: 'contactOf',
+  }),
+  friendRequest: one(friendRequests, {
+    fields: [contacts.friendRequestId],
+    references: [friendRequests.id],
   }),
 }));
 

@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
 import jwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
 import swagger from '@fastify/swagger';
@@ -52,6 +53,15 @@ async function start() {
     await fastify.register(cors, {
       origin: true,
       credentials: true,
+    });
+
+    await fastify.register(rateLimit, {
+      max: parseInt(process.env.RATE_LIMIT_MAX || '1000'), // Configurável via env
+      timeWindow: process.env.RATE_LIMIT_TIME_WINDOW || '1 minute',
+      // Configurações adicionais para desenvolvimento
+      skipOnError: true, // Skip rate limiting on internal errors
+      skipSuccessfulRequests: false,
+      skipFailedRequests: false,
     });
 
     await fastify.register(jwt, {

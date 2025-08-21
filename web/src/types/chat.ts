@@ -1,6 +1,7 @@
 // User types
 export interface User {
   id: string;
+  username?: string; // Username for display purposes
   name: string;
   email: string;
   avatar?: string;
@@ -17,6 +18,17 @@ export interface Contact {
   updatedAt: string;
 }
 
+// Message status types
+export type MessageStatusType = 'sent' | 'delivered' | 'read';
+
+export interface MessageStatus {
+  id: string;
+  messageId: string;
+  userId: string;
+  status: MessageStatusType;
+  timestamp: string;
+}
+
 // Message types
 export interface Message {
   id: string;
@@ -25,8 +37,10 @@ export interface Message {
   conversationId: string;
   senderId: string;
   sender?: User; // Made optional to handle cases where sender data might be missing
+  status?: MessageStatusType | null; // Current user's status for this message (for viewing perspective)
+  statusTimestamp?: string | null; // Timestamp of when status was updated
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 // Conversation types
@@ -80,20 +94,44 @@ export interface SocketEvents {
     createdAt: string;
   }) => void;
 
+  'message:delivered': (data: {
+    messageId: string;
+    userId: string;
+    timestamp: string;
+  }) => void;
+
+  'message:read': (data: {
+    messageId: string;
+    userId: string;
+    timestamp: string;
+  }) => void;
+
   // Typing events
   'typing:start': (data: { conversationId: string; userId: string; userName: string }) => void;
   'typing:stop': (data: { conversationId: string; userId: string; userName: string }) => void;
 
   // Presence events
-  'presence:update': (data: { userId: string; status: 'online' | 'offline' }) => void;
+  'presence:update': (data: { 
+    userId: string; 
+    isOnline: boolean; 
+    lastSeen: string;
+    deviceId?: string;
+  }) => void;
+  
+  // Status events
+  'status:update': (data: {
+    userId: string;
+    status: 'online' | 'busy' | 'away' | 'offline';
+    timestamp: string;
+  }) => void;
 }
 
 // Context types
 export interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<void>;
+  register: (name: string, username: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
   isAuthenticated: boolean;

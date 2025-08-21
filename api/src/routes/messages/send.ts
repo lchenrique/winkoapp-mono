@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { db, messages, conversationMembers, users } from '../../lib/db';
 import { eq, and, isNull } from 'drizzle-orm';
 import { authenticate } from '../../middlewares/auth';
-import { getSimpleSocketService } from '../../services/socket-debug';
+import { getSocketService } from '../../services/socket';
 
 const sendMessageSchema = z.object({
   content: z.string().min(1).max(4000),
@@ -18,6 +18,13 @@ const messageResponseSchema = z.object({
   type: z.enum(['text', 'image', 'video', 'audio', 'document']),
   createdAt: z.string(),
   updatedAt: z.string(),
+  status: z.string().nullable(),
+  statusTimestamp: z.string().nullable(),
+  sender: z.object({
+    id: z.string(),
+    name: z.string(),
+    avatar: z.string().nullable(),
+  }).optional(),
 });
 
 export const sendMessage: FastifyPluginAsyncZod = async (app) => {
@@ -100,7 +107,7 @@ export const sendMessage: FastifyPluginAsyncZod = async (app) => {
         });
 
       // Emit Socket.IO event to notify other users in the conversation
-      const socketService = getSimpleSocketService();
+      const socketService = getSocketService();
       if (socketService && sender) {
         const messageData = {
           messageId: newMessage.id,
@@ -132,6 +139,15 @@ export const sendMessage: FastifyPluginAsyncZod = async (app) => {
         type: newMessage.type,
         createdAt: newMessage.createdAt.toISOString(),
         updatedAt: newMessage.updatedAt.toISOString(),
+        // Mensagens novas sempre começam como 'sent'
+        status: 'sent',
+        statusTimestamp: new Date().toISOString(),
+        // Incluir informações do sender
+        sender: sender ? {
+          id: sender.id,
+          name: sender.name,
+          avatar: sender.avatar,
+        } : undefined,
       });
     } catch (error) {
       request.log.error(error);

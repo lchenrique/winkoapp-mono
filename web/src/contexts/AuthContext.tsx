@@ -32,10 +32,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setIsLoading(false);
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (identifier: string, password: string) => {
     setIsLoading(true);
     try {
-      const response = await authAPI.login(email, password);
+      const response = await authAPI.login(identifier, password);
       
       setToken(response.token);
       setUser(response.user);
@@ -52,10 +52,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const register = async (name: string, email: string, password: string) => {
+  const register = async (name: string, username: string, email: string, password: string) => {
     setIsLoading(true);
     try {
-      const response = await authAPI.register(name, email, password);
+      const response = await authAPI.register(name, username, email, password);
       
       setToken(response.token);
       setUser(response.user);

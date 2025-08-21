@@ -34,17 +34,17 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}) {
 
 // Auth API
 export const authAPI = {
-  async login(email: string, password: string) {
+  async login(identifier: string, password: string) {
     return apiRequest('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ identifier, password }),
     });
   },
 
-  async register(name: string, email: string, password: string) {
+  async register(name: string, username: string, email: string, password: string) {
     return apiRequest('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, username, email, password }),
     });
   },
 };
@@ -76,8 +76,15 @@ export const conversationsAPI = {
     });
   },
 
-  async getMessages(conversationId: string) {
-    return apiRequest(`/conversations/${conversationId}/messages`);
+  async getMessages(conversationId: string, options?: { limit?: number; offset?: number }) {
+    const searchParams = new URLSearchParams();
+    if (options?.limit) searchParams.set('limit', options.limit.toString());
+    if (options?.offset) searchParams.set('offset', options.offset.toString());
+    
+    const query = searchParams.toString();
+    const endpoint = query ? `/conversations/${conversationId}/messages?${query}` : `/conversations/${conversationId}/messages`;
+    
+    return apiRequest(endpoint);
   },
 
   async sendMessage(conversationId: string, content: string, type: 'text' = 'text') {
@@ -85,5 +92,38 @@ export const conversationsAPI = {
       method: 'POST',
       body: JSON.stringify({ content, type }),
     });
+  },
+
+  async markMessageAsRead(conversationId: string, messageId: string) {
+    return apiRequest(`/conversations/${conversationId}/messages/mark-read`, {
+      method: 'POST',
+      body: JSON.stringify({ messageId }),
+    });
+  },
+
+  async markMessageAsDelivered(conversationId: string, messageId: string) {
+    return apiRequest(`/conversations/${conversationId}/messages/mark-delivered`, {
+      method: 'POST',
+      body: JSON.stringify({ messageId }),
+    });
+  },
+
+  async getMessageStatus(conversationId: string, messageIds?: string[]) {
+    const query = messageIds?.length ? `?messageIds=${messageIds.join(',')}` : '';
+    return apiRequest(`/conversations/${conversationId}/messages/status${query}`);
+  },
+};
+
+// Users API
+export const usersAPI = {
+  async updateStatus(userStatus: 'online' | 'busy' | 'away' | 'offline') {
+    return apiRequest('/users/me/status', {
+      method: 'PATCH',
+      body: JSON.stringify({ userStatus }),
+    });
+  },
+
+  async getProfile() {
+    return apiRequest('/users/me');
   },
 };

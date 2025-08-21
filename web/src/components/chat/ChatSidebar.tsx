@@ -3,11 +3,11 @@ import { Search, Settings, Plus, User, UserPlus } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { useChatStore } from "@/stores/chatStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { FriendRequests } from "@/components/FriendRequests";
+import { UnreadBadge } from "@/components/UnreadBadge";
 
 // Helper functions
 function getInitials(name: string): string {
@@ -17,6 +17,20 @@ function getInitials(name: string): string {
     .join('')
     .toUpperCase()
     .slice(0, 2);
+}
+
+function getStatusConfig(status: 'online' | 'busy' | 'away' | 'offline') {
+  switch (status) {
+    case 'online':
+      return { color: 'bg-green-500', label: 'Online' };
+    case 'busy':
+      return { color: 'bg-red-500', label: 'Ocupado' };
+    case 'away':
+      return { color: 'bg-yellow-500', label: 'Ausente' };
+    case 'offline':
+    default:
+      return { color: 'bg-gray-400', label: 'Offline' };
+  }
 }
 
 function formatTime(dateString: string): string {
@@ -47,27 +61,59 @@ export function ChatSidebar({ selectedChatId, onChatSelect }: ChatSidebarProps) 
   const {
     contacts,
     isLoading,
-    loadContacts,
     selectContactConversation,
-    addContact,
+    isUserOnline,
+    getUserStatus,
+    loadContacts,
+    loadConversations,
+    preloadRecentConversations,
+    preloadedMessages,
+    contactConversationCache,
   } = useChatStore();
   
-  // Add contact dialog state
-  const [isAddContactOpen, setIsAddContactOpen] = useState(false);
-  const [newContactId, setNewContactId] = useState('');
-  const [newContactNickname, setNewContactNickname] = useState('');
+  // Get current user status
+  const currentUserStatus = user?.id ? getUserStatus(user.id) : 'online';
+  const currentUserStatusConfig = getStatusConfig(currentUserStatus);
+  
+  // Friend requests dialog state
+  const [showFriendRequests, setShowFriendRequests] = useState(false);
 
-  // Load contacts on mount
+
+
+
+
+  // Load contacts and setup preloading on mount
   useEffect(() => {
     if (user) {
-      loadContacts().catch(console.error);
+      const initializeChat = async () => {
+        try {
+          // Load basic data first
+          await Promise.all([
+            loadContacts(),
+            loadConversations(),
+          ]);
+          
+          // Preload recent conversations ONLY on initial page load
+          // This ensures badges appear after refresh, but won't interfere with real-time updates
+          console.log('🚀 Chat initialized, calling preloadRecentConversations for initial load');
+          setTimeout(() => {
+            preloadRecentConversations().catch(console.error);
+          }, 500); // Shorter timeout for better UX
+        } catch (error) {
+          console.error('Failed to initialize chat:', error);
+        }
+      };
+      
+      initializeChat();
     }
-  }, [user, loadContacts]);
+  }, [user, loadContacts, loadConversations, preloadRecentConversations]);
 
   // Handle contact selection
   const handleContactSelect = async (contactId: string, contactName: string) => {
     try {
-      await selectContactConversation(contactId, contactName);
+      // Pass userId to automatically mark messages as read
+      await selectContactConversation(contactId, contactName, user?.id);
+      
       // The selectedChatId will be updated by the store, but we need to notify parent
       onChatSelect(contactId);
     } catch (error) {
@@ -79,28 +125,6 @@ export function ChatSidebar({ selectedChatId, onChatSelect }: ChatSidebarProps) 
     }
   };
 
-  // Handle add contact
-  const handleAddContact = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newContactId.trim()) return;
-    
-    try {
-      await addContact(newContactId.trim(), newContactNickname.trim() || undefined);
-      setIsAddContactOpen(false);
-      setNewContactId('');
-      setNewContactNickname('');
-      toast({
-        title: 'Contato adicionado!',
-        description: 'Conversa iniciada com sucesso',
-      });
-    } catch (error) {
-      toast({
-        title: 'Erro ao adicionar contato',
-        description: error instanceof Error ? error.message : 'Erro desconhecido',
-        variant: 'destructive',
-      });
-    }
-  };
 
   return (
     <div className="w-80 bg-card border-r border-border flex flex-col h-full">
@@ -108,51 +132,15 @@ export function ChatSidebar({ selectedChatId, onChatSelect }: ChatSidebarProps) 
       <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Dialog open={isAddContactOpen} onOpenChange={setIsAddContactOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" variant="ghost" className="p-1 h-6 w-6">
-                  <UserPlus className="h-4 w-4" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Adicionar Contato</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleAddContact} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="contact-id">ID do Usuário</Label>
-                    <Input
-                      id="contact-id"
-                      placeholder={`Seu ID: ${user?.id || ''}`}
-                      value={newContactId}
-                      onChange={(e) => setNewContactId(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="contact-nickname">Apelido (opcional)</Label>
-                    <Input
-                      id="contact-nickname"
-                      placeholder="Como você quer chamá-lo?"
-                      value={newContactNickname}
-                      onChange={(e) => setNewContactNickname(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button type="submit" className="flex-1">
-                      Adicionar
-                    </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={() => setIsAddContactOpen(false)}
-                    >
-                      Cancelar
-                    </Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              className="p-1 h-6 w-6"
+              onClick={() => setShowFriendRequests(true)}
+              title="Adicionar Contato"
+            >
+              <UserPlus className="h-4 w-4" />
+            </Button>
             <span className="text-xs text-muted-foreground">{contacts.length}</span>
           </div>
           <Button size="sm" variant="ghost" className="p-1 h-6 w-6">
@@ -187,6 +175,52 @@ export function ChatSidebar({ selectedChatId, onChatSelect }: ChatSidebarProps) 
           contacts.map((contact) => {
             const contactName = contact.nickname || contact.contact.name;
             const isSelected = selectedChatId === contact.contact.id;
+            const userStatus = getUserStatus(contact.contact.id);
+            const isOnline = isUserOnline(contact.contact.id);
+            const statusConfig = getStatusConfig(userStatus);
+            
+            // Force re-render by accessing preloadedMessages state directly
+            const _forceUpdate = preloadedMessages;
+            
+            // Get unread count for this contact's conversation using your approach
+            const conversationId = contactConversationCache.get(contact.contact.id);
+            
+            let unreadCount = 0;
+            if (conversationId && preloadedMessages.get(conversationId)) {
+              const messages = preloadedMessages.get(conversationId)!;
+              const timestamp = new Date().toISOString();
+             
+              unreadCount = messages.reduce((acc, message) => {
+                // Skip messages sent by current user
+                if (message.senderId === user?.id || message.sender?.id === user?.id) {
+                  console.log(`⏭️ [${timestamp}] Skipping message from current user: ${message.id.substring(0, 8)}`);
+                  return acc;
+                }
+                
+                // Count messages that are not read
+                const isUnread = message.status !== 'read';
+                console.log(`📋 [${timestamp}] Message ${message.id.substring(0, 8)}: status='${message.status}', statusTimestamp='${message.statusTimestamp}', isUnread=${isUnread}`);
+                
+                if (isUnread) {
+                  return acc + 1;
+                }
+                return acc;
+              }, 0);
+            }
+            
+            console.log('📋 ChatSidebar: Contact', contactName, {
+              contactId: contact.contact.id,
+              conversationId,
+              unreadCount,
+              hasCachedConversation: !!conversationId,
+              status: userStatus,
+              isOnline
+            });
+            
+            // Debug: Check if we have the conversation in the cache
+            if (!conversationId) {
+              console.log('⚠️ No conversation ID found for contact:', contact.contact.id, 'Cache:', Array.from(contactConversationCache.entries()));
+            }
             
             return (
               <button
@@ -198,31 +232,75 @@ export function ChatSidebar({ selectedChatId, onChatSelect }: ChatSidebarProps) 
                     : "border-l-transparent"
                 }`}
               >
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={contact.contact.avatar} />
-                  <AvatarFallback className="bg-secondary text-sm">
-                    {getInitials(contactName)}
-                  </AvatarFallback>
-                </Avatar>
+                <div className="relative">
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={contact.contact.avatar} />
+                    <AvatarFallback className="bg-secondary text-sm">
+                      {getInitials(contactName)}
+                    </AvatarFallback>
+                  </Avatar>
+                  {/* Status badge */}
+                  <div 
+                    className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-card ${
+                      statusConfig.color
+                    }`}
+                    title={statusConfig.label}
+                  />
+                  {/* Unread messages badge */}
+                  {unreadCount > 0 && (
+                    <UnreadBadge 
+                      count={unreadCount} 
+                      className="-top-1 -right-1" 
+                    />
+                  )}
+                </div>
                 
                 <div className="flex-1 min-w-0 text-left">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-sm text-foreground truncate">
-                      {contactName}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm text-foreground truncate">
+                        {contactName}
+                      </span>
+                      {userStatus !== 'offline' && (
+                        <span className={`text-xs font-medium ${
+                          userStatus === 'online' ? 'text-green-500' :
+                          userStatus === 'busy' ? 'text-red-500' :
+                          userStatus === 'away' ? 'text-yellow-500' :
+                          'text-gray-400'
+                        }`}>
+                          •
+                        </span>
+                      )}
+                    </div>
                     <span className="text-xs text-muted-foreground">
                       {formatTime(contact.createdAt)}
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">
-                    #{contact.contact.id}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground truncate">
+                      @{contact.contact.username || 'user'}
+                    </p>
+                    <span className={`text-xs ${
+                      userStatus === 'online' ? 'text-green-500' :
+                      userStatus === 'busy' ? 'text-red-500' :
+                      userStatus === 'away' ? 'text-yellow-500' :
+                      'text-gray-400'
+                    }`}>
+                      {statusConfig.label.toLowerCase()}
+                    </span>
+                  </div>
                 </div>
               </button>
             );
           })
         )}
       </div>
+      
+      {/* Friend Requests Modal */}
+      <FriendRequests
+        open={showFriendRequests}
+        onOpenChange={setShowFriendRequests}
+      />
     </div>
   );
 }
